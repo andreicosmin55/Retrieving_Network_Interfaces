@@ -2,7 +2,7 @@ import os
 import json
 import ipaddress
 
-'''
+''' 
     # hex_to_ip(): function used to convert a hexadecimal IPv4 address to dotted decimal format.
     # Input: str -> Output: str
 '''
@@ -17,8 +17,18 @@ def hex_to_ip(hex_str):
     # conversion from big-endian format hexadecimal to little-endian format decimal
     return '.'.join(str(int(hex_str[i:i+2], 16)) for i in range(6, -2, -2))
 
-
+''' 
+    # decimal_to_ip(): function used to convert a decimal IPv4 subnet mask to dotted decimal format.
+    # Input: int -> Output: str
+'''
 def decimal_to_ip(decimal):
+    if not isinstance(decimal, int):
+        raise ValueError("Input must be an integer.")
+
+    # 1-32 value for int is valid
+    if decimal < 1 or decimal > 32:
+        raise ValueError("Input must be between 1 and 32.")
+
     # 32-bit mask with decimal number of ones
     mask = (0xFFFFFFFF << (32 - decimal)) & 0xFFFFFFFF
 
@@ -32,13 +42,12 @@ def decimal_to_ip(decimal):
 
     return '.'.join(map(str, octets))
 
-
 '''
     # get_inet(): function used to get the IPv4 address and netmask of an interface from /proc/net/ files.
     # Input: str -> Output: dict
 '''
 def get_inet(interface):
-    net_tuple = None
+    net_tuple = "null"
 
     # treat special case of loopback interface since it is not present in /proc/net/route
     if interface == "lo":
@@ -60,7 +69,7 @@ def get_inet(interface):
                     if '/32 host' in line and '127.' in prev_line:
                         matching_line = prev_line.split()[1] if len(line.split()) > 1 else None
                     prev_line = line
-                if matching_line:
+                if matching_line and mask:
                     net_tuple = {"address": matching_line, "netmask": decimal_to_ip(mask)}
 
         except FileNotFoundError:
@@ -72,12 +81,12 @@ def get_inet(interface):
         return net_tuple
 
     else:
-        # extract local routes from /proc/net/fib_trie
+        # extract other local routes from /proc/net/fib_trie
         try:
             with open("/proc/net/fib_trie", "r") as f:
                 lines = f.readlines()
                 local_routes = []
-                flag = False  # flag used to check if "Local" has appeared
+                flag = False  # flag used to check if line starts with "Local:", then append all the lines after it
                 for line in lines:
                     if line.strip().startswith("Local:"):
                         flag = True
@@ -97,12 +106,12 @@ def get_inet(interface):
         network_routes = {}
         try:
             with open("/proc/net/route", "r") as f:
-                for line in f.readlines()[1:]:  # Skip the header line
+                for line in f.readlines()[1:]:  # skip the header line
                     parts = line.split()
-                    iface, dest, _, _, _, _, _, mask = parts[:8]
-                    if iface == interface and dest != "00000000" and mask != "FFFFFFFF":
+                    iface, net_dest, _, _, _, _, _, mask = parts[:8]
+                    if iface == interface and net_dest != "00000000" and mask != "FFFFFFFF":
                         if iface not in network_routes:
-                            network_routes[iface] = [(dest, mask)]
+                            network_routes[iface] = [(net_dest, mask)]
         except FileNotFoundError:
             print("Error: /proc/net/route not found.")
         except PermissionError:
@@ -116,7 +125,7 @@ def get_inet(interface):
 
                 matching_line = None
                 flag = False
-                # go through all the correct net values up until /32 host, and keep the line above it
+                # find the last matching net address before reaching the one containing "/32 host"
                 for line in local_routes:
                     if net_dec in line.split():
                         flag = True
@@ -129,7 +138,6 @@ def get_inet(interface):
                     net_tuple = {"address": matching_line, "netmask": mask_dec}
 
             return net_tuple
-
 
 '''
     # hex_to_ipv6(): function used to convert a hexadecimal string IPv6 address to colon separated format.
@@ -145,21 +153,20 @@ def hex_to_ipv6(hex_addr):
 
     return ":".join(hex_addr[i:i+4] for i in range(0, 32, 4))
 
-
 '''
-    # hex_to_mask(): function used to convert a decimal int mask to colon separated format.
+    # hex_to_mask(): function used to convert a hexadecimal mask to colon separated format.
     # Input: int -> Output: str
 '''
 def hex_to_mask(prefix_len):
+    prefix_len = int(prefix_len, 16)
     # first prefix_len bits are set to one, the rest until 128 to zero
     mask_bits = f"{'1' * prefix_len}{'0' * (128 - prefix_len)}"
 
     # conversion from binary to hex, and display 0 instead of 0000
     return ":".join(hex(int(mask_bits[i:i+16], 2))[2:].lstrip("0") or "0" for i in range(0, 128, 16))
 
-
 '''
-    # get_inet6(): function used to get the IPv6 address and netmask of an interface from /proc/net/ files.
+    # get_inet6(): function used to get the IPv6 address and subnet mask of an interface from /proc/net/ files.
     # Input: str -> Output: dict
 '''
 def get_inet6(ifname):
@@ -172,7 +179,8 @@ def get_inet6(ifname):
                     parts = line.split()
                     dest, prefix_len, _, _, _, _, _, _, _, iface = parts[:10]
                     if iface == ifname and dest != "00000000000000000000000000000000" and prefix_len != "00":
-                        return {"ipv6_addr": str(ipaddress.ip_address(hex_to_ipv6(dest))), "network_mask": hex_to_mask(int(prefix_len, 16))}
+                        return {"ipv6_addr": str(ipaddress.ip_address(hex_to_ipv6(dest))), "network_mask": hex_to_mask(prefix_len)}
+                return "null"
         except FileNotFoundError:
             print("Error: /proc/net/if_inet6 not found.")
         except PermissionError:
@@ -199,26 +207,23 @@ def get_inet6(ifname):
         if not final_ipv6_addr:
             return "null"
 
-        network_mask = "null"
+        network_mask = None
         with open("/proc/net/ipv6_route", "r") as f:
             for line in f:
                 parts = line.split()
                 dest, prefix_len, _, _, _, _, _, _, _, iface = parts[:10]
-
                 # name-check, check for the first 4 hextet to be the same, destination netmask should not be 128
                 if iface == ifname and hex_to_ipv6(dest).startswith(final_ipv6_addr[:19]) and int(prefix_len, 16) != 128:
-                    network_mask = hex_to_mask(int(prefix_len, 16))
+                    network_mask = hex_to_mask(prefix_len)
                     break
 
         return {"ipv6_addr": str(ipaddress.ip_address(final_ipv6_addr)), "network_mask": network_mask}
 
-
 '''
-    # get_interfaces(): function used to get the IPv6 address and netmask of an interface from /proc/net/ files.
-    # Input: str -> Output: dict
+    # get_interfaces_info(): function used to get the details of all network interfaces present in /sys/class/net
+    # Output: list 
 '''
 def get_interfaces_info():
-    """Retrieve details of all network interfaces (excluding loopback)."""
     net_path = "/sys/class/net/"
     interfaces = []
 
@@ -234,7 +239,7 @@ def get_interfaces_info():
             except (FileNotFoundError, PermissionError, OSError):
                 return None
 
-        # building the json
+        # build the json
         interfaces.append({
             "ifname": ifname,
             "hwaddr": read_file(os.path.join(iface_path, "address")),
@@ -242,7 +247,7 @@ def get_interfaces_info():
             "inet": get_inet(ifname),
             "inet6": get_inet6(ifname),
             "mtu": read_file(os.path.join(iface_path, "mtu")),
-            "link_speed": read_file(os.path.join(iface_path, "speed")),
+            "link_speed": read_file(os.path.join(iface_path, "speed"))
         })
 
     return interfaces
