@@ -130,7 +130,6 @@ def get_inet(interface):
         for _, networks in network_routes.items():
             for net_hex, mask_hex in networks:
                 net_dec, mask_dec = hex_to_ip(net_hex), hex_to_ip(mask_hex)
-                print("interface:", interface, "net_dec: ", net_dec)
                 matching_line = None
                 flag = False
                 # find the last matching net address before reaching the one containing "/32 host"
