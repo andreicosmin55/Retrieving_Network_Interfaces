@@ -2,10 +2,10 @@ import os
 import json
 import ipaddress
 
-''' 
-    # hex_to_ip(): convert a hexadecimal IPv4 address to dotted decimal format.
-    # Input: str -> Output: str
-'''
+
+# hex_to_ip(): convert a hexadecimal IPv4 address to dotted decimal format.
+# Input: str -> Output: str
+
 def hex_to_ip(hex_str):
     if not isinstance(hex_str, str):
         raise ValueError("Input must be a string.")
@@ -17,10 +17,10 @@ def hex_to_ip(hex_str):
     # conversion from big-endian format hexadecimal to little-endian format decimal
     return '.'.join(str(int(hex_str[i:i+2], 16)) for i in range(6, -2, -2))
 
-''' 
-    # decimal_to_ip(): convert a decimal IPv4 subnet mask to dotted decimal format.
-    # Input: int -> Output: str
-'''
+
+# decimal_to_ip(): convert a decimal IPv4 subnet mask to dotted decimal format.
+# Input: int -> Output: str
+
 def decimal_to_ip(decimal):
     if not isinstance(decimal, int):
         raise ValueError("Input must be an integer.")
@@ -42,10 +42,10 @@ def decimal_to_ip(decimal):
 
     return '.'.join(map(str, octets))
 
-'''
-    # get_loopback_inet(): get the IPv4 address and netmask of loopback interface from /proc/net/fib_trie
-    # Input: str -> Output: dict
-'''
+
+# get_loopback_inet(): get the IPv4 address and netmask of loopback interface from /proc/net/fib_trie
+# Input: str -> Output: dict
+
 def get_loopback_inet(interface):
     net_tuple = "null"
     try:
@@ -77,10 +77,10 @@ def get_loopback_inet(interface):
         print(f"Unexpected error: {e}")
     return net_tuple
 
-'''
-    # get_inet(): get the IPv4 address and netmask of an interface from /proc/net/ files.
-    # Input: str -> Output: dict
-'''
+
+# get_inet(): get the IPv4 address and netmask of an interface from /proc/net/ files.
+# Input: str -> Output: dict
+
 def get_inet(interface):
     net_tuple = "null"
 
@@ -146,10 +146,10 @@ def get_inet(interface):
 
             return net_tuple
 
-'''
-    # hex_to_ipv6(): convert a hexadecimal string IPv6 address to colon separated format.
-    # Input: str -> Output: str
-'''
+
+# hex_to_ipv6(): convert a hexadecimal string IPv6 address to colon separated format.
+# Input: str -> Output: str
+
 def hex_to_ipv6(hex_addr):
     if not isinstance(hex_addr, str):
         raise ValueError("Input must be a string.")
@@ -160,10 +160,10 @@ def hex_to_ipv6(hex_addr):
 
     return ":".join(hex_addr[i:i+4] for i in range(0, 32, 4))
 
-'''
-    # hex_to_mask(): convert a hexadecimal mask to colon separated format.
-    # Input: int -> Output: str
-'''
+
+# hex_to_mask(): convert a hexadecimal mask to colon separated format.
+# Input: int -> Output: str
+
 def hex_to_mask(prefix_len):
     prefix_len = int(prefix_len, 16)
     # first prefix_len bits are set to one, the rest until 128 to zero
@@ -172,10 +172,10 @@ def hex_to_mask(prefix_len):
     # conversion from binary to hex, and display 0 instead of 0000
     return ":".join(hex(int(mask_bits[i:i+16], 2))[2:].lstrip("0") or "0" for i in range(0, 128, 16))
 
-'''
-    # get_loopback_inet6(): retrieve the ipv6 address and subnet mask of loopback interface from /proc/net/ipv6_route
-    # Input: str -> Output: dict
-'''
+
+# get_loopback_inet6(): retrieve the ipv6 address and subnet mask of loopback interface from /proc/net/ipv6_route
+# Input: str -> Output: dict
+
 def get_loopback_inet6(interface_name):
     try:
         with open("/proc/net/ipv6_route", "r") as f:
@@ -193,10 +193,10 @@ def get_loopback_inet6(interface_name):
     except Exception as e:
         print(f"Unexpected error: {e}")
 
-'''
-    # get_inet6(): get the IPv6 address and subnet mask of an interface from /proc/net/ files.
-    # Input: str -> Output: dict
-'''
+
+# get_inet6(): get the IPv6 address and subnet mask of an interface from /proc/net/ files.
+# Input: str -> Output: dict
+
 def get_inet6(interface_name):
     final_ipv6_addr = None
 
@@ -234,10 +234,10 @@ def get_inet6(interface_name):
 
         return {"ipv6_addr": str(ipaddress.ip_address(final_ipv6_addr)), "network_mask": network_mask}
 
-'''
-    # get_interfaces_info(): get the details of all network interfaces present in /sys/class/net
-    # Output: list 
-'''
+
+# get_interfaces_info(): get the details of all network interfaces present in /sys/class/net
+# Output: list
+
 def get_interfaces_info():
     net_path = "/sys/class/net/"
     interfaces = []
@@ -267,9 +267,43 @@ def get_interfaces_info():
 
     return interfaces
 
-
+ # default color output
 if __name__ == "__main__":
     interfaces_info = get_interfaces_info()
     data = {"count": len(interfaces_info), "interfaces": interfaces_info}
     print(json.dumps(data, indent=2))
+
+ # blue keys colored output
+# if __name__ == "__main__":
+#     interfaces_info = get_interfaces_info()
+#     data = {"count": len(interfaces_info), "interfaces": interfaces_info}
+#
+#     # ANSI color codes
+#     KEY_COLOR = "\033[1;34m"  # blue color for keys
+#     RESET_COLOR = "\033[0m"   # reset color to default terminal output color
+#
+#     json_str = json.dumps(data, indent=2)
+#
+#     # search for all unique keys
+#     def find_keys(obj):
+#         keys = set()
+#         if isinstance(obj, dict):
+#             keys.update(obj.keys())
+#             for value in obj.values():
+#                 keys.update(find_keys(value))
+#         elif isinstance(obj, list):
+#             for item in obj:
+#                 keys.update(find_keys(item))
+#         return keys
+#
+#     all_keys = find_keys(data)
+#
+#     # add color to the keys of the JSON
+#     for key in all_keys:
+#         json_str = json_str.replace(f'"{key}"', f'{KEY_COLOR}"{key}"{RESET_COLOR}')
+#
+#     print(json_str)
+
+
+
 
